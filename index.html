@@ -95,7 +95,7 @@ h1 { font-family: var(--body); font-size: 26px; font-weight: 700; line-height: 1
   box-shadow: 0 2px 4px rgba(0, 0, 204, 0.04);
 }
 .tabs {
-  display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;
   padding: 0 48px;
   max-width: 1600px; margin: 0 auto;
 }
@@ -396,16 +396,20 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; background: v
       <div class="tab-icon">02</div>
       <div class="tab-label"><span class="tab-name">Customer Renewal Status</span><span class="tab-desc">Active · In-window · Churned</span></div>
     </div>
-    <div class="tab" data-tab="exposure">
+    <div class="tab" data-tab="model">
       <div class="tab-icon">03</div>
+      <div class="tab-label"><span class="tab-name">Renewal Model</span><span class="tab-desc">Should-be revenue vs actual · adjustable assumptions</span></div>
+    </div>
+    <div class="tab" data-tab="exposure">
+      <div class="tab-icon">04</div>
       <div class="tab-label"><span class="tab-name">Exposure Modeling</span><span class="tab-desc">"What if renewals are mishandled" scenarios</span></div>
     </div>
     <div class="tab" data-tab="audit">
-      <div class="tab-icon">04</div>
+      <div class="tab-icon">05</div>
       <div class="tab-label"><span class="tab-name">Source Reconciliation</span><span class="tab-desc">PDF-to-dashboard audit trail</span></div>
     </div>
     <div class="tab" data-tab="methodology">
-      <div class="tab-icon">05</div>
+      <div class="tab-icon">06</div>
       <div class="tab-label"><span class="tab-name">Methodology</span><span class="tab-desc">Assumptions, caveats, confidence levels</span></div>
     </div>
   </div>
@@ -568,6 +572,107 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; background: v
         <tbody id="active-tbody"></tbody>
       </table>
     </div>
+  </div>
+</section>
+
+<!-- ============ TAB: RENEWAL MODEL ============ -->
+<section class="panel" id="panel-model">
+  <div class="section-head">
+    <div class="section-title">Renewal Economics Model — Should-Be vs. Actual</div>
+    <div class="section-meta">Adjustable assumptions · Customer cohorts · Year-by-year reconciliation</div>
+  </div>
+
+  <div class="callout info">
+    <div class="callout-title">How this model works</div>
+    <p>For each year, we count <strong>new customers Flexera actually acquired</strong> (from royalty reports — not projected) and add modeled renewals from prior cohorts. Each customer added in year Y is assumed to renew at the slider's <strong>Renewal Rate</strong> in subsequent years, valued at their original first-deal price (no annual uplift). The <strong>Silent Renewal</strong> slider models customers we have classified as churned but who may have renewed at Flexera unbilled to Liquit.</p>
+    <p style="margin-top: 8px;">The model gives the finance team an honest "what should this look like" baseline to compare against what was actually paid — and a way to translate slider assumptions directly into a dollar gap.</p>
+  </div>
+
+  <h2>Adjustable Assumptions</h2>
+  <div class="card-grid cols-2">
+    <div class="card" style="padding: 22px 24px;">
+      <div class="card-label">Renewal Rate</div>
+      <div style="display: flex; align-items: center; gap: 16px; margin: 12px 0 8px;">
+        <input type="range" id="renewal-rate-slider" min="0" max="100" step="5" value="85" style="flex: 1;">
+        <span class="slider-value" id="renewal-rate-value" style="min-width: 80px;">85%</span>
+      </div>
+      <div class="card-detail">% of customers from each prior cohort assumed to renew each year. <strong>Healthy B2B SaaS: 85–95%</strong>. Set lower if you assume Liquit's product has higher genuine churn than typical SaaS.</div>
+    </div>
+    <div class="card" style="padding: 22px 24px;">
+      <div class="card-label">Silent Renewal Rate</div>
+      <div style="display: flex; align-items: center; gap: 16px; margin: 12px 0 8px;">
+        <input type="range" id="silent-rate-slider" min="0" max="100" step="5" value="0" style="flex: 1;">
+        <span class="slider-value" id="silent-rate-value" style="min-width: 80px;">0%</span>
+      </div>
+      <div class="card-detail">Of customers we observed as <strong>churned</strong>, the % we assume actually renewed at Flexera but were never paid through to Liquit. At 0%, the model trusts our churn data. At 50%, we assume half were silently renewed.</div>
+    </div>
+  </div>
+
+  <h2>Should-Be Revenue Headlines</h2>
+  <div class="card-grid cols-4">
+    <div class="card">
+      <div class="card-label">Cumulative Should-Be Revenue</div>
+      <div class="card-value primary" id="model-cum-rev">—</div>
+      <div class="card-detail">Total expected through Q1 2026</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Cumulative Should-Be Royalty</div>
+      <div class="card-value primary" id="model-cum-roy">—</div>
+      <div class="card-detail">At cumulative-tier rates</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Cumulative Royalty Gap</div>
+      <div class="card-value risk" id="model-cum-gap">—</div>
+      <div class="card-detail" id="model-cum-gap-detail">vs. actual paid</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Current Run-Rate Gap (annualized)</div>
+      <div class="card-value warn" id="model-runrate-gap">—</div>
+      <div class="card-detail">Based on most recent full year</div>
+    </div>
+  </div>
+
+  <h2>Year-by-Year: Should-Be vs Actual</h2>
+  <p>Each year's revenue broken down by new customers (acquired that year) and modeled renewals. Compare against what Flexera actually paid Liquit.</p>
+
+  <div class="bar-chart"><div id="model-bar-chart"></div></div>
+
+  <div class="tbl-wrap">
+    <div class="tbl-head"><h4>Annual reconciliation</h4><span style="font-size: 11px; color: var(--medium);">Updates live with sliders</span></div>
+    <table>
+      <thead><tr>
+        <th>Year</th>
+        <th class="num">New Cust.</th>
+        <th class="num">Active Book</th>
+        <th class="num">Should-Be Rev</th>
+        <th class="num">Actual Rev</th>
+        <th class="num">Rev Gap</th>
+        <th class="num">Tier</th>
+        <th class="num">Should-Be Roy</th>
+        <th class="num">Actual Roy</th>
+        <th class="num">Royalty Gap</th>
+      </tr></thead>
+      <tbody id="model-table"></tbody>
+    </table>
+  </div>
+
+  <h2>Customer Cohort Build-Up</h2>
+  <p>How each cohort (year of first purchase) decays over time at the assumed renewal rate. Each row shows that cohort's customer count flowing forward year by year.</p>
+
+  <div class="tbl-wrap">
+    <div class="tbl-head"><h4>Cohort retention table (customer counts)</h4></div>
+    <table>
+      <thead id="cohort-thead"></thead>
+      <tbody id="cohort-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-title">Model simplifications & caveats</div>
+    <p style="margin-bottom: 8px;"><strong>1. Flat pricing</strong> — each renewal is valued at the cohort's average first-deal price (no annual uplift). In reality Flexera typically increases prices 3–7%/year, so the gap is likely understated.</p>
+    <p style="margin-bottom: 8px;"><strong>2. New customers from history only</strong> — we don't project future new acquisitions. The gap shown is for the existing book only.</p>
+    <p style="margin-bottom: 8px;"><strong>3. 2026 is partial</strong> — Q1 only, so 2026 figures represent ~25% of a full year and should not be annualized directly.</p>
+    <p><strong>4. Tier rates are cumulative</strong> — should-be royalty applies the tier rate that would actually be in effect at that cumulative revenue level, which is typically lower than the actual rate Flexera paid in that period.</p>
   </div>
 </section>
 
@@ -1227,6 +1332,229 @@ function renderAudit() {
   document.getElementById('audit-table').innerHTML = html;
 }
 
+// =========== TAB: RENEWAL MODEL ===========
+const MODEL_DATA = {"cohorts":{"2019":{"year":2019,"new_customers":18,"new_revenue":113640.70416,"avg_first_deal":6313.372453333333},"2020":{"year":2020,"new_customers":52,"new_revenue":517022.6500000002,"avg_first_deal":9942.743269230774},"2021":{"year":2021,"new_customers":40,"new_revenue":654451.9099999999,"avg_first_deal":16361.297749999998},"2022":{"year":2022,"new_customers":30,"new_revenue":559474.63,"avg_first_deal":18649.154333333332},"2023":{"year":2023,"new_customers":20,"new_revenue":328473.3900000001,"avg_first_deal":16423.669500000004},"2024":{"year":2024,"new_customers":12,"new_revenue":122978.20999999999,"avg_first_deal":10248.184166666666},"2025":{"year":2025,"new_customers":12,"new_revenue":120217.54999999999,"avg_first_deal":10018.129166666666},"2026":{"year":2026,"new_customers":9,"new_revenue":123448.21,"avg_first_deal":13716.467777777778}},"annual_actuals":{"2019":{"year":2019,"actual_revenue":117688.73916,"actual_royalty":48986.36366,"effective_rate":0.4162366256078429,"new_count":19,"renewal_count":1},"2020":{"year":2020,"actual_revenue":764900.9099999999,"actual_royalty":305069.62,"effective_rate":0.39883547791830976,"new_count":52,"renewal_count":23},"2021":{"year":2021,"actual_revenue":1108051.63,"actual_royalty":443220.68,"effective_rate":0.4000000252695807,"new_count":40,"renewal_count":38},"2022":{"year":2022,"actual_revenue":1281921.8499999999,"actual_royalty":466845.31,"effective_rate":0.3641761079273281,"new_count":30,"renewal_count":65},"2023":{"year":2023,"actual_revenue":1114465.8599999999,"actual_royalty":306911.01999999996,"effective_rate":0.2753884448286285,"new_count":20,"renewal_count":56},"2024":{"year":2024,"actual_revenue":1189061.16,"actual_royalty":297946.73999999993,"effective_rate":0.2505730992003809,"new_count":12,"renewal_count":58},"2025":{"year":2025,"actual_revenue":943386.42,"actual_royalty":196574.75000000003,"effective_rate":0.20837140097903892,"new_count":12,"renewal_count":54},"2026":{"year":2026,"actual_revenue":269881.62,"actual_royalty":53976.32,"effective_rate":0.19999998517868686,"new_count":9,"renewal_count":7}},"meta":{"total_revenue":6789358.18916,"total_royalty":2119530.8036599997,"churned_count":121}};
+
+function getTierRate(cumRev, year) {
+  // Pre-2023: 2 tiers (40% / 35%)
+  if (year < 2023) {
+    return cumRev <= 1_000_000 ? 0.40 : 0.35;
+  }
+  // 2023+: Amendment 5 tiers
+  if (cumRev <= 1_000_000) return 0.40;
+  if (cumRev <= 2_000_000) return 0.35;
+  if (cumRev <= 4_000_000) return 0.30;
+  if (cumRev <= 6_000_000) return 0.25;
+  return 0.20;
+}
+
+function runRenewalModel(renewalRate, silentRate) {
+  const cohorts = MODEL_DATA.cohorts;
+  const actuals = MODEL_DATA.annual_actuals;
+  const years = Object.keys(cohorts).map(Number).sort();
+
+  const results = [];
+  let cumActualRev = 0;
+  let cumShouldRev = 0;
+  let cumShouldRoy = 0;
+  let cumActualRoy = 0;
+
+  // For each year, compute: new revenue + renewal revenue
+  for (const y of years) {
+    const yKey = String(y);
+    const newCustomers = cohorts[yKey] ? cohorts[yKey].new_customers : 0;
+    const newRevenue = cohorts[yKey] ? cohorts[yKey].new_revenue : 0;
+
+    // Renewal revenue from each prior cohort
+    let renewalRevenue = 0;
+    let activeBook = newCustomers;
+    let cohortDetail = {};
+    for (const cy of years) {
+      if (cy >= y) break;
+      const cohort = cohorts[String(cy)];
+      if (!cohort) continue;
+      const yearsElapsed = y - cy;
+      // Effective renewal rate considers silent renewal recovery
+      // Without silent: customers retained = N * r^k
+      // With silent (s%): of the (1-r) drop, s% are "silently retained"
+      // So retention per year = r + (1-r)*s
+      const effRate = renewalRate + (1 - renewalRate) * silentRate;
+      const retainedCount = cohort.new_customers * Math.pow(effRate, yearsElapsed);
+      const cohortRev = retainedCount * cohort.avg_first_deal;
+      renewalRevenue += cohortRev;
+      activeBook += retainedCount;
+      cohortDetail[cy] = {count: retainedCount, revenue: cohortRev};
+    }
+
+    const shouldBeRev = newRevenue + renewalRevenue;
+    const actualRev = actuals[yKey] ? actuals[yKey].actual_revenue : 0;
+    const actualRoy = actuals[yKey] ? actuals[yKey].actual_royalty : 0;
+
+    // Tier rate for the year - use cumulative SHOULD-BE revenue (if everything had been billed correctly)
+    cumShouldRev += shouldBeRev;
+    cumActualRev += actualRev;
+    const tierRate = getTierRate(cumShouldRev, y);
+    const shouldBeRoy = shouldBeRev * tierRate;
+
+    cumShouldRoy += shouldBeRoy;
+    cumActualRoy += actualRoy;
+
+    results.push({
+      year: y,
+      newCustomers,
+      newRevenue,
+      activeBook,
+      renewalRevenue,
+      shouldBeRev,
+      actualRev,
+      revGap: shouldBeRev - actualRev,
+      tierRate,
+      shouldBeRoy,
+      actualRoy,
+      royaltyGap: shouldBeRoy - actualRoy,
+      cohortDetail,
+    });
+  }
+
+  return {
+    rows: results,
+    cumShouldRev,
+    cumActualRev,
+    cumShouldRoy,
+    cumActualRoy,
+    cumRoyGap: cumShouldRoy - cumActualRoy,
+  };
+}
+
+function renderModel() {
+  const renewalRate = parseInt(document.getElementById('renewal-rate-slider').value) / 100;
+  const silentRate = parseInt(document.getElementById('silent-rate-slider').value) / 100;
+  document.getElementById('renewal-rate-value').textContent = (renewalRate*100).toFixed(0) + '%';
+  document.getElementById('silent-rate-value').textContent = (silentRate*100).toFixed(0) + '%';
+
+  const result = runRenewalModel(renewalRate, silentRate);
+
+  // Headlines
+  document.getElementById('model-cum-rev').textContent = fmt$0(result.cumShouldRev);
+  document.getElementById('model-cum-roy').textContent = fmt$0(result.cumShouldRoy);
+  document.getElementById('model-cum-gap').textContent = fmt$0(result.cumRoyGap);
+  document.getElementById('model-cum-gap-detail').textContent = 'Should-be ' + fmt$0(result.cumShouldRoy) + ' vs. actual ' + fmt$0(result.cumActualRoy);
+
+  // Run-rate gap: use the most recent FULL year (2025)
+  const fullYears = result.rows.filter(r => r.year < 2026 && r.year >= 2024);
+  const recent = fullYears[fullYears.length - 1];
+  if (recent) {
+    document.getElementById('model-runrate-gap').textContent = fmt$0(recent.royaltyGap);
+  } else {
+    document.getElementById('model-runrate-gap').textContent = '—';
+  }
+
+  // Table
+  const tbody = document.getElementById('model-table');
+  let tableHtml = '';
+  for (const r of result.rows) {
+    const gapClass = r.royaltyGap > 0 ? 'risk' : 'green';
+    const revGapClass = r.revGap > 0 ? 'risk' : 'green';
+    tableHtml += `<tr>
+      <td><strong>${r.year}</strong></td>
+      <td class="num">${r.newCustomers}</td>
+      <td class="num">${r.activeBook.toFixed(0)}</td>
+      <td class="num">${fmt$0(r.shouldBeRev)}</td>
+      <td class="num">${fmt$0(r.actualRev)}</td>
+      <td class="num" style="color: var(--${revGapClass});"><strong>${r.revGap >= 0 ? '+' : ''}${fmt$0(r.revGap)}</strong></td>
+      <td class="num"><span class="tag" style="background:var(--accent-soft); color:var(--primary);">${(r.tierRate*100).toFixed(0)}%</span></td>
+      <td class="num">${fmt$0(r.shouldBeRoy)}</td>
+      <td class="num">${fmt$0(r.actualRoy)}</td>
+      <td class="num" style="color: var(--${gapClass});"><strong>${r.royaltyGap >= 0 ? '+' : ''}${fmt$0(r.royaltyGap)}</strong></td>
+    </tr>`;
+  }
+  // Total row
+  const totShouldRev = result.cumShouldRev;
+  const totActualRev = result.cumActualRev;
+  const totShouldRoy = result.cumShouldRoy;
+  const totActualRoy = result.cumActualRoy;
+  tableHtml += `<tr style="background: var(--light-gray);">
+    <td><strong>TOTAL</strong></td>
+    <td class="num">—</td><td class="num">—</td>
+    <td class="num"><strong>${fmt$0(totShouldRev)}</strong></td>
+    <td class="num"><strong>${fmt$0(totActualRev)}</strong></td>
+    <td class="num" style="color: var(--risk);"><strong>+${fmt$0(totShouldRev - totActualRev)}</strong></td>
+    <td class="num">—</td>
+    <td class="num"><strong>${fmt$0(totShouldRoy)}</strong></td>
+    <td class="num"><strong>${fmt$0(totActualRoy)}</strong></td>
+    <td class="num" style="color: var(--risk);"><strong>+${fmt$0(result.cumRoyGap)}</strong></td>
+  </tr>`;
+  tbody.innerHTML = tableHtml;
+
+  // Bar chart: should-be vs actual royalty per year
+  const maxVal = Math.max(...result.rows.map(r => Math.max(r.shouldBeRoy, r.actualRoy)));
+  let chartHtml = '';
+  for (const r of result.rows) {
+    const wShould = (r.shouldBeRoy / maxVal * 100).toFixed(1);
+    const wActual = (r.actualRoy / maxVal * 100).toFixed(1);
+    chartHtml += `
+      <div class="bar-row"><span class="bar-label">${r.year} Should-be</span><div class="bar-track"><div class="bar-fill" style="width:${wShould}%; background: var(--primary);"></div></div><span class="bar-value">${fmt$0(r.shouldBeRoy)}</span></div>
+      <div class="bar-row"><span class="bar-label">${r.year} Actual</span><div class="bar-track"><div class="bar-fill" style="width:${wActual}%; background: var(--accent);"></div></div><span class="bar-value">${fmt$0(r.actualRoy)}</span></div>
+      <div style="height: 6px;"></div>
+    `;
+  }
+  chartHtml += `
+    <div class="bar-legend">
+      <span><span style="background:var(--primary);"></span>Should-Be Royalty (modeled)</span>
+      <span><span style="background:var(--accent);"></span>Actual Royalty Paid</span>
+    </div>`;
+  document.getElementById('model-bar-chart').innerHTML = chartHtml;
+
+  // Cohort retention table
+  const cohorts = MODEL_DATA.cohorts;
+  const cohortYears = Object.keys(cohorts).map(Number).sort();
+  const dispYears = cohortYears;
+  let theadHtml = '<tr><th>Cohort (year of first purchase)</th>';
+  for (const y of dispYears) theadHtml += `<th class="num">${y}</th>`;
+  theadHtml += '</tr>';
+  document.getElementById('cohort-thead').innerHTML = theadHtml;
+
+  let cohortHtml = '';
+  for (const cy of cohortYears) {
+    const cohort = cohorts[String(cy)];
+    let row = `<tr><td><strong>${cy}</strong> <span style="font-size:10px; color: var(--medium);">(${cohort.new_customers} new · avg $${Math.round(cohort.avg_first_deal).toLocaleString()})</span></td>`;
+    const effRate = renewalRate + (1 - renewalRate) * silentRate;
+    for (const y of dispYears) {
+      if (y < cy) {
+        row += '<td class="num faint">—</td>';
+      } else if (y === cy) {
+        row += `<td class="num" style="background: var(--accent-soft); color: var(--primary); font-weight: 700;">${cohort.new_customers}</td>`;
+      } else {
+        const k = y - cy;
+        const retained = cohort.new_customers * Math.pow(effRate, k);
+        row += `<td class="num dim">${retained.toFixed(1)}</td>`;
+      }
+    }
+    row += '</tr>';
+    cohortHtml += row;
+  }
+  // Footer: total active book each year
+  let footerRow = '<tr style="background: var(--light-gray); font-weight: 700;"><td><strong>Total Active Book</strong></td>';
+  const effRate = renewalRate + (1 - renewalRate) * silentRate;
+  for (const y of dispYears) {
+    let total = 0;
+    for (const cy of cohortYears) {
+      if (cy > y) continue;
+      const cohort = cohorts[String(cy)];
+      const k = y - cy;
+      total += cohort.new_customers * Math.pow(effRate, k);
+    }
+    footerRow += `<td class="num"><strong>${total.toFixed(0)}</strong></td>`;
+  }
+  footerRow += '</tr>';
+  cohortHtml += footerRow;
+  document.getElementById('cohort-tbody').innerHTML = cohortHtml;
+}
+
+document.getElementById('renewal-rate-slider').addEventListener('input', renderModel);
+document.getElementById('silent-rate-slider').addEventListener('input', renderModel);
+
+// Init
 // Init
 document.getElementById('gen-date').textContent = new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'});
 renderKPI();
@@ -1238,6 +1566,7 @@ renderRenewal();
 renderExposure();
 updateScenarios();
 renderAudit();
+renderModel();
 </script>
 </body>
 </html>
